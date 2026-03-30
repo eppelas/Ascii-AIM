@@ -4,7 +4,9 @@
 
 # Run and deploy your AI Studio app
 
-This contains everything you need to run your app locally.
+This repository is configured to deploy to GitHub Pages through [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml).
+
+Saved examples are stored in the browser with `localStorage`, so the app stays compatible with static hosting.
 
 View your app in AI Studio: https://ai.studio/apps/2dbe04c3-5e89-4176-b527-c28474821221
 
@@ -18,3 +20,14 @@ View your app in AI Studio: https://ai.studio/apps/2dbe04c3-5e89-4176-b527-c2847
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## Preview the production build
+
+1. Build the site:
+   `npm run build`
+2. Preview the static output:
+   `npm run preview -- --host 0.0.0.0 --port 4173`
+
+## Deploy to GitHub Pages
+
+Push to `main` to trigger the Pages workflow and publish the contents of `dist/`.

@@ -5,12 +5,54 @@ import { RefreshCw, Play, Pause, Video, Copy, Check, FileDown, Image as ImageIco
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { GIFEncoder, quantize, applyPalette } from 'gifenc';
+import defaultExamples from './data/examples.json';
+import { svgLibrary } from './data/svgLibrary';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-import { svgLibrary } from './data/svgLibrary';
+type ExamplePreset = {
+  name: string;
+  style: 'classic' | 'technical' | 'blueprint' | 'glitch' | 'complex-ascii' | string;
+  shapes: string[];
+  color: string;
+  bgColor?: string;
+};
+
+const DEFAULT_EXAMPLES = defaultExamples as ExamplePreset[];
+const CUSTOM_EXAMPLES_STORAGE_KEY = 'ascii-aim-custom-examples';
+
+function getDefaultBackgroundForStyle(style: ExamplePreset['style']) {
+  if (style === 'technical') return '#050505';
+  if (style === 'blueprint') return '#0a1a3a';
+  if (style === 'complex-ascii') return '#08080a';
+  return '#111113';
+}
+
+function readCustomExamples(): ExamplePreset[] {
+  if (typeof window === 'undefined') return [];
+
+  try {
+    const raw = window.localStorage.getItem(CUSTOM_EXAMPLES_STORAGE_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error('Failed to read saved examples:', error);
+    return [];
+  }
+}
+
+function writeCustomExamples(examples: ExamplePreset[]) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(CUSTOM_EXAMPLES_STORAGE_KEY, JSON.stringify(examples));
+}
+
+function mergeExamples(customExamples: ExamplePreset[]) {
+  return [...DEFAULT_EXAMPLES, ...customExamples];
+}
 
 // --- Data Definitions ---
 
@@ -627,7 +669,7 @@ const segmentsToPath = (segments: any[]) => {
 };
 
 export default function App() {
-  const [activePreset, setActivePreset] = useState(6);
+  const [activePreset, setActivePreset] = useState(Math.min(6, DEFAULT_EXAMPLES.length - 1));
   const [isPlaying, setIsPlaying] = useState(true);
   const [isCopying, setIsCopying] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -651,7 +693,7 @@ export default function App() {
   const [renderStyle, setRenderStyle] = useState<'classic' | 'technical' | 'blueprint' | 'glitch' | 'complex-ascii'>('blueprint');
   const [viewMode, setViewMode] = useState<'single' | 'gallery'>('single');
   const [technicalText, setTechnicalText] = useState('AI Mindset Lab');
-  const [examples, setExamples] = useState<any[]>([]);
+  const [examples, setExamples] = useState<ExamplePreset[]>(DEFAULT_EXAMPLES);
   
   // Modal state
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
@@ -659,14 +701,7 @@ export default function App() {
   const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
-    fetch('/api/examples')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setExamples(data);
-        }
-      })
-      .catch(err => console.error('Failed to load examples:', err));
+    setExamples(mergeExamples(readCustomExamples()));
   }, []);
 
   const progress = useMotionValue(0);
@@ -1890,28 +1925,33 @@ export default function App() {
             <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Examples</h2>
             <div className="grid grid-cols-2 gap-2">
               {examples.map((preset, i) => (
-                <button
-                  key={i}
-                  onClick={() => {
-                    setActivePreset(i);
-                    setRenderStyle(preset.style as any);
-                    setShapeSequence(preset.shapes);
-                    setColor(preset.color);
-                    if (preset.style === 'technical') setBgColor('#050505');
-                    else if (preset.style === 'blueprint') setBgColor('#0a1a3a');
-                    else if (preset.style === 'complex-ascii') setBgColor('#08080a');
-                    else setBgColor('#111113');
-                  }}
-                  className={cn(
-                    "px-3 py-2 rounded-md text-[10px] font-medium border transition-all text-left flex flex-col gap-1",
-                    activePreset === i 
-                      ? "bg-zinc-800 border-zinc-600 text-white" 
-                      : "bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-700"
+                <div key={`${preset.name}-${i}`} className="relative">
+                  <button
+                    onClick={() => applyPreset(i, preset)}
+                    className={cn(
+                      "w-full px-3 py-2 rounded-md text-[10px] font-medium border transition-all text-left flex flex-col gap-1",
+                      activePreset === i 
+                        ? "bg-zinc-800 border-zinc-600 text-white" 
+                        : "bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-700"
+                    )}
+                  >
+                    <span className="text-zinc-200 pr-6">{preset.name}</span>
+                    <span className="text-[9px] opacity-50 uppercase">{preset.style}</span>
+                  </button>
+                  {i >= DEFAULT_EXAMPLES.length && (
+                    <button
+                      type="button"
+                      aria-label={`Delete ${preset.name}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleDeleteExample(i);
+                      }}
+                      className="absolute top-2 right-2 p-1 rounded-md text-zinc-500 hover:text-white hover:bg-zinc-700/70 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   )}
-                >
-                  <span className="text-zinc-200">{preset.name}</span>
-                  <span className="text-[9px] opacity-50 uppercase">{preset.style}</span>
-                </button>
+                </div>
               ))}
             </div>
           </section>
@@ -2323,7 +2363,7 @@ export default function App() {
   async function handleSaveExample() {
     if (!newExampleName.trim()) return;
     
-    const data = {
+    const newExample: ExamplePreset = {
       name: newExampleName.trim(),
       shapes: shapeSequence,
       style: renderStyle,
@@ -2332,22 +2372,57 @@ export default function App() {
     };
     
     try {
-      const res = await fetch('/api/examples', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      if (res.ok) {
-        const newExample = await res.json();
-        setExamples(prev => [...prev, newExample]);
-        setActivePreset(examples.length);
-        setIsSaveModalOpen(false);
-      } else {
-        setSaveError("Failed to save example");
+      const customExamples = [...readCustomExamples(), newExample];
+      writeCustomExamples(customExamples);
+
+      setExamples(mergeExamples(customExamples));
+      setActivePreset(DEFAULT_EXAMPLES.length + customExamples.length - 1);
+      setSaveError('');
+      setNewExampleName('');
+      setIsSaveModalOpen(false);
+    } catch (error) {
+      console.error(error);
+      setSaveError("Error saving example locally");
+    }
+  }
+
+  function applyPreset(index: number, preset: ExamplePreset) {
+    setActivePreset(index);
+    setRenderStyle(preset.style as any);
+    setShapeSequence(preset.shapes);
+    setColor(preset.color);
+    setBgColor(preset.bgColor ?? getDefaultBackgroundForStyle(preset.style));
+  }
+
+  async function handleDeleteExample(index: number) {
+    if (index < DEFAULT_EXAMPLES.length) return;
+
+    try {
+      const customIndex = index - DEFAULT_EXAMPLES.length;
+      const customExamples = readCustomExamples();
+      const nextCustomExamples = customExamples.filter((_, itemIndex) => itemIndex !== customIndex);
+      const nextExamples = mergeExamples(nextCustomExamples);
+
+      writeCustomExamples(nextCustomExamples);
+      setExamples(nextExamples);
+
+      if (nextExamples.length === 0) {
+        setActivePreset(-1);
+        return;
       }
-    } catch (err) {
-      console.error(err);
-      setSaveError("Error saving example");
+
+      if (activePreset === index) {
+        const fallbackIndex = Math.min(index, nextExamples.length - 1);
+        applyPreset(fallbackIndex, nextExamples[fallbackIndex]);
+        return;
+      }
+
+      if (activePreset > index) {
+        setActivePreset(activePreset - 1);
+      }
+    } catch (error) {
+      console.error(error);
+      setSaveError("Error deleting example locally");
     }
   }
 }
