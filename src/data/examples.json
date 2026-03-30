@@ -1,0 +1,9 @@
+[
+  { "name": "Core Cube (2)", "style": "classic", "shapes": ["ascii-0", "cube"], "color": "#a3e635" },
+  { "name": "Data Sphere (2)", "style": "technical", "shapes": ["ascii-1", "sphere"], "color": "#FF3333" },
+  { "name": "Blueprint Torus (2)", "style": "blueprint", "shapes": ["ascii-2", "torus"], "color": "#ffffff" },
+  { "name": "Neural Network (2)", "style": "complex-ascii", "shapes": ["ascii-3", "network"], "color": "#00ffff" },
+  { "name": "Community Flow (2)", "style": "complex-ascii", "shapes": ["ascii-19", "ascii-20"], "color": "#a3e635" },
+  { "name": "Practice Build (4)", "style": "technical", "shapes": ["ascii-21", "ascii-22", "ascii-23", "ascii-24"], "color": "#fbbf24" },
+  { "name": "Personal Focus (4)", "style": "blueprint", "shapes": ["ascii-25", "ascii-26", "ascii-27", "ascii-28"], "color": "#38bdf8" }
+]
